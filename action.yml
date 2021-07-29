@@ -1,0 +1,5 @@
+name: "CodeQL Container Action"
+description: "Run a CodeQL security scan and put markdown report in CODEQL_MD env variable"
+runs:
+  using: "docker"
+  image: "Dockerfile"
