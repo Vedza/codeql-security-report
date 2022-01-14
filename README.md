@@ -4,7 +4,7 @@ This action will run CodeQL rules on files in `$GITHUB_WORKSPACE` and checks for
 
 ## Usage
 
-Here is an action that will run on every pull request and post the result in a comment:
+Here is an action that will run on every pull request, scan all the files and post the result in a comment:
 
 ```yaml
 name: CodeQL Security Scan
@@ -25,6 +25,52 @@ jobs:
            ${{ env.CODEQL_MD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+Here is an action that will run on every pull request, scan only the files edited in the PR and post the result in a comment:
+
+```yaml
+name: CodeQL Security Scan
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      LANGUAGE: javascript
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v13.1
+        
+      - name: Delete unedited files
+        id: delete
+        continue-on-error: true
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_and_modified_files }}; do
+            edited="$edited ! -name ${file##*/}"
+          done
+          edited="${edited:1}"
+          find $GITHUB_WORKSPACE $edited -type f -exec rm -f {} +
+          ls -R $GITHUB_WORKSPACE
+          if [[ "$edited" == *".js"* ]]; then
+            exit 0
+          fi
+          exit 1
+          
+      - name: Run CodeQL scan
+        if: steps.delete.outcome == 'success'
+        uses: vedza/codeql-security-report@master
+      - name: Comment PR
+        if: steps.delete.outcome == 'success'
+        uses: thollander/actions-comment-pull-request@main
+        with:
+          message: |
+           ${{ env.CODEQL_MD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+
 
 ### Docker image issue
 The docker image of this action is based on [mcr.microsoft.com/cstsectools/codeql-container](https://github.com/microsoft/codeql-container). But because of some issue, I had to build my own image [vedza/codeql-github-action](codeql_base/Dockerfile), which use the same Dockerfile as [mcr.microsoft.com/cstsectools/codeql-container](https://github.com/microsoft/codeql-container).
